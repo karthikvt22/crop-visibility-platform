@@ -2,56 +2,43 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Google Sheets Auth
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "C:/Users/Karthik/Desktop/crop-visibility-platform-2cd3eaba3ee3.json", scope)
+# Set up Google Sheets API
+scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive']
+creds = ServiceAccountCredentials.from_json_keyfile_name("crop-visibility-platform-2cd3eaba3ee3.json", scope)
 client = gspread.authorize(creds)
 
-# Open Login Data sheet
-sheet = client.open("Login Data").sheet1  # Make sure sheet name is exactly "Login Data"
+# Open the Google Sheet
+sheet = client.open("User Credentials").sheet1
 
-st.set_page_config(page_title="Crop Visibility Platform")
+# Function to check login credentials
+def check_login(username, password, role):
+    # Check each row to see if the username, password, and role match
+    for row in sheet.get_all_records():
+        # Debugging: Output the row content
+        print("Row content:", row)  # This line will print the entire row to the console
 
+        # Safely strip whitespace and handle potential None values
+        stored_username = row.get('username', '').strip() if row.get('username') else ''
+        stored_password = row.get('password', '').strip() if row.get('password') else ''
+        stored_role = row.get('role', '').strip() if row.get('role') else ''
+
+        # Debugging: Output the processed credentials
+        print(f"Checking: username='{stored_username}', password='{stored_password}', role='{stored_role}'")  # Debugging
+
+        # Compare the provided data with stored data
+        if stored_username == username and stored_password == password and stored_role == role:
+            return True
+    return False
+
+# Streamlit login form
 st.title("🌾 Crop Visibility Platform")
-st.markdown("""
-This platform helps farmers and buyers connect by showing:
 
-🌿 Crop health based on NPK, weather, and crop age  
-📊 Market price analysis and predictions  
-🧑‍🌾 Farmer crop profiles  
-🏢 Demand postings from organizations  
-""")
-
-st.header("Login or Sign Up")
-
-role = st.radio("Who are you?", ["Farmer", "Buyer"])
+role = st.selectbox("Who are you?", ["Farmer", "Buyer"])
 username = st.text_input("Username")
 password = st.text_input("Password", type="password")
 
 if st.button("Login"):
-    login_success = False
-    # Fetch and normalize records
-    raw_records = sheet.get_all_records()
-    records = []
-    for row in raw_records:
-        # strip whitespace from keys and values, and lowercase the keys
-        normalized = {k.strip().lower(): str(v).strip() for k, v in row.items()}
-        records.append(normalized)
-
-    # normalize user input
-    u = username.strip()
-    p = password.strip()
-    r = role.lower().strip()
-
-    for row in records:
-        if row.get('username') == u and row.get('password') == p and row.get('role') == r:
-            login_success = True
-            break
-
-    if login_success:
+    if check_login(username, password, role):
         st.success(f"Welcome, {username} 👋! Logged in as {role}")
-        # TODO: Show dashboard based on role
     else:
         st.error("Invalid credentials or role mismatch")
-
