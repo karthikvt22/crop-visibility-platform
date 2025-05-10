@@ -1,6 +1,6 @@
 import streamlit as st
 import random
-import pandas as pd
+from datetime import datetime
 
 # --- Set up page ---
 st.set_page_config(page_title="Crop Visibility Platform", layout="wide")
@@ -44,31 +44,39 @@ else:
     if st.session_state.user_role == "Farmer":
         st.subheader("👨‍🌾 Farmer Dashboard")
 
-        # Crop selection
-        st.markdown("### 🧪 Crop Health Analysis")
-        crop_name = st.selectbox("Select your crop", ["Onion", "Tomato", "Potato"])
+        # Crop information form
+        st.markdown("### 🌱 Add Your Crop Info")
+        crop_name = st.selectbox("Select Crop", ["Onion", "Tomato", "Potato"])
+        
+        npk_n = st.number_input("N (Nitrogen) level", min_value=0, max_value=100, value=50)
+        npk_p = st.number_input("P (Phosphorus) level", min_value=0, max_value=100, value=50)
+        npk_k = st.number_input("K (Potassium) level", min_value=0, max_value=100, value=50)
+        
+        sowing_date = st.date_input("Sowing Date", min_value=datetime.today())
+        crop_image = st.file_uploader("Upload Crop Image", type=["jpg", "jpeg", "png"])
 
-        # Simulated NPK values
-        npk_values = {
-            "N": random.randint(10, 80),
-            "P": random.randint(5, 40),
-            "K": random.randint(20, 90)
-        }
-        st.write(f"NPK Levels → N: {npk_values['N']}, P: {npk_values['P']}, K: {npk_values['K']}")
+        # Form submit
+        if st.button("Submit Crop Info"):
+            # Simulate health analysis based on NPK range
+            health_status = "Good" if all(30 <= v <= 70 for v in [npk_n, npk_p, npk_k]) else "Needs Attention"
+            price_prediction = random.randint(15, 120)  # Mock future price prediction
+            st.success(f"Crop Health Status: **{health_status}**")
+            st.success(f"Estimated Price for {crop_name}: ₹{price_prediction}/kg")
 
-        # Health evaluation
-        health_status = "Good" if all(30 <= v <= 70 for v in npk_values.values()) else "Needs Attention"
-        st.info(f"Crop Health Status: **{health_status}**")
+            # Crop profile details display
+            st.markdown("### 📸 Crop Profile")
+            st.image(crop_image) if crop_image else st.warning("No image uploaded")
+            st.write(f"Crop Name: {crop_name}")
+            st.write(f"NPK Levels → N: {npk_n}, P: {npk_p}, K: {npk_k}")
+            st.write(f"Sowing Date: {sowing_date}")
 
-        # Market prediction (mock)
-        st.markdown("### 📈 Market Price Prediction")
-        future_price = random.randint(15, 120)
-        st.success(f"Estimated price in 2 months for {crop_name}: ₹{future_price}/kg")
-
-        # Buyer interest mock
-        st.markdown("### 💬 Buyer Interest")
-        st.write("👤 **AgroMart Pvt Ltd** is interested in 500kg of Onion.")
-        st.write("👤 **FreshBasket Org** wants to connect for Tomato supply.")
+            # Save to session (mock database storage)
+            st.session_state.crop_data = {
+                "crop_name": crop_name,
+                "npk": {"N": npk_n, "P": npk_p, "K": npk_k},
+                "sowing_date": sowing_date,
+                "price_prediction": price_prediction
+            }
 
     elif st.session_state.user_role == "Buyer":
         st.subheader("🏢 Buyer Dashboard")
