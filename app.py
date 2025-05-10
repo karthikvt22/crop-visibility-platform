@@ -1,14 +1,16 @@
 import streamlit as st
+import random
+import pandas as pd
 
-# Set up page
+# --- Set up page ---
 st.set_page_config(page_title="Crop Visibility Platform", layout="wide")
 
-# Session state for login
+# --- Session state for login ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user_role = None
 
-# Title and intro
+# --- App Title and Intro ---
 st.title("🌾 Crop Visibility Platform")
 st.markdown("""
 This platform helps farmers and buyers connect by showing:
@@ -19,7 +21,7 @@ This platform helps farmers and buyers connect by showing:
 """)
 st.divider()
 
-# Login / Signup
+# --- Login / Signup ---
 if not st.session_state.logged_in:
     st.subheader("Login or Sign Up")
 
@@ -29,7 +31,7 @@ if not st.session_state.logged_in:
 
     if st.button("Login"):
         if username and password:
-            # Mock logic
+            # Mock login logic
             st.session_state.logged_in = True
             st.session_state.user_role = role
             st.success(f"Welcome, {username} 👋! Logged in as {role}")
@@ -37,15 +39,40 @@ if not st.session_state.logged_in:
         else:
             st.error("Please enter both username and password.")
 
+# --- After login ---
 else:
-    # Show different dashboards
     if st.session_state.user_role == "Farmer":
         st.subheader("👨‍🌾 Farmer Dashboard")
-        st.markdown("✔️ Market Overview\n✔️ Crop Health\n✔️ Price Prediction\n✔️ Buyer Interests")
+
+        # Crop selection
+        st.markdown("### 🧪 Crop Health Analysis")
+        crop_name = st.selectbox("Select your crop", ["Onion", "Tomato", "Potato"])
+
+        # Simulated NPK values
+        npk_values = {
+            "N": random.randint(10, 80),
+            "P": random.randint(5, 40),
+            "K": random.randint(20, 90)
+        }
+        st.write(f"NPK Levels → N: {npk_values['N']}, P: {npk_values['P']}, K: {npk_values['K']}")
+
+        # Health evaluation
+        health_status = "Good" if all(30 <= v <= 70 for v in npk_values.values()) else "Needs Attention"
+        st.info(f"Crop Health Status: **{health_status}**")
+
+        # Market prediction (mock)
+        st.markdown("### 📈 Market Price Prediction")
+        future_price = random.randint(15, 120)
+        st.success(f"Estimated price in 2 months for {crop_name}: ₹{future_price}/kg")
+
+        # Buyer interest mock
+        st.markdown("### 💬 Buyer Interest")
+        st.write("👤 **AgroMart Pvt Ltd** is interested in 500kg of Onion.")
+        st.write("👤 **FreshBasket Org** wants to connect for Tomato supply.")
 
     elif st.session_state.user_role == "Buyer":
         st.subheader("🏢 Buyer Dashboard")
-        st.markdown("✔️ Top Performing Crops\n✔️ Farmer Listings\n✔️ Contact Farmers\n✔️ Post Demand")
+        st.markdown("Coming soon: view farmer profiles, crop listings, and post demand.")
 
     if st.button("Logout"):
         st.session_state.logged_in = False
