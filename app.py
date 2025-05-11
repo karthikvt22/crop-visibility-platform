@@ -1,13 +1,28 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+from prophet import Prophet
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error
-import statsmodels.api as sm
 
-# Dataset you provided
+# Helper to suppress Prophet output (optional, makes Streamlit cleaner)
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
+import os, sys # Import sys here
+
+@contextmanager
+def suppress_stdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = devnull
+        sys.stderr = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
+
+# --- Dataset (included directly in the code) ---
 data = {
     'Date': ['01/01/2021', '02/01/2021', '03/01/2021', '04/01/2021', '05/01/2021', '06/01/2021', '07/01/2021', '08/01/2021',
              '01/02/2021', '02/02/2021', '03/02/2021', '04/02/2021', '05/02/2021', '06/02/2021', '07/02/2021', '08/02/2021',
@@ -35,131 +50,159 @@ data = {
                   1600, 1600, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000] # 68 entries
 }
 
-st.title("Tomato Price Analysis and Prediction")
+st.title("🌾 Smart Agriculture Assistant")
+st.header("🍅 Tomato Price Predictor")
+st.write("Select a date and click 'Predict Prices' to see the forecast.")
 
 # --- Prepare Data for Training/Evaluation (using available data) ---
 
-# Determine the minimum length of the lists
-min_len = min(len(lst) for lst in data.values())
+# Determine the minimum length of the lists (assuming price lists dictate available data length)
+min_len = min(len(data['Min_Price']), len(data['Max_Price']), len(data['Avg_Price']))
+date_list_len = len(data['Date'])
 
-# Create a new dictionary with lists truncated to the minimum length
-data_aligned = {key: value[:min_len] for key, value in data.items()}
+st.sidebar.warning(f"Using built-in data: Dates for {date_list_len} days, price data for {min_len} days.")
 
-# Create DataFrame from the aligned data (this will have 68 rows)
-df_available = pd.DataFrame(data_aligned)
+# Create a DataFrame using only the first `min_len` dates and all price data
+# This aligns the 68 price points with the first 68 dates in the Date list.
+data_aligned_for_training = {
+    'Date': data['Date'][:min_len],
+    'Min_Price': data['Min_Price'][:min_len],
+    'Max_Price': data['Max_Price'][:min_len],
+    'Avg_Price': data['Avg_Price'][:min_len]
+}
+df_available = pd.DataFrame(data_aligned_for_training)
 
 # Convert the Date column to datetime format
 df_available['Date'] = pd.to_datetime(df_available['Date'], format='%d/%m/%Y')
 
-# Feature Engineering: Extract Date features for the available data
-df_available['Day_of_Year'] = df_available['Date'].dt.dayofyear
-df_available['Month'] = df_available['Date'].dt.month
-df_available['Year'] = df_available['Date'].dt.year # Year is constant 2021 here
+# Prepare data for Prophet: rename columns and ensure numeric types
+# Use the 'Avg_Price' as the 'Modal_Price' for forecasting consistency with the user's previous code structure
+df_available = df_available.rename(columns={'Date': 'ds', 'Avg_Price': 'y_modal', 'Min_Price': 'y_min', 'Max_Price': 'y_max'})
+df_available['y_modal'] = pd.to_numeric(df_available['y_modal'])
+df_available['y_min'] = pd.to_numeric(df_available['y_min'])
+df_available['y_max'] = pd.to_numeric(df_available['y_max'])
 
-st.warning(f"Note: The dataset contains dates for {len(data['Date'])} days, but only {min_len} days have complete price data. Analysis and model training are based on the {min_len} available data points.")
+# Check if there's enough data for training
+if len(df_available) < 2:
+     st.error("Error: Not enough historical data points to train the model (need at least 2).")
+     # Stop here if data is insufficient
+     st.stop() # Use st.stop() to halt execution
 
-# --- Train and Evaluate Model on AVAILABLE Data ---
-if not df_available.empty:
-    st.subheader("Model Training and Evaluation (using available data)")
 
-    # Prepare the dataset for training using available data
-    # Using 'Day_of_Year' and 'Month' as 'Year' is constant in this dataset
-    X_available = df_available[['Day_of_Year', 'Month']]
-    y_available = df_available['Avg_Price']
+# --- User Input: Select Date and Button ---
+user_date = st.date_input("Select a date for prediction", pd.to_datetime("2025-12-01"))
+predict_button = st.button("Predict Prices")
 
-    # Train-test split (on available data)
-    if len(df_available) > 1: # Need at least 2 samples for train_test_split
-        # Adjust test_size if data is very small, or use LOOCV/cross-validation
-        # For simplicity with this small dataset, let's ensure a valid split is possible
-        test_size = max(0.2, 1/len(df_available)) # Ensure test set has at least 1 sample if possible
-        X_train, X_test, y_train, y_test = train_test_split(X_available, y_available, test_size=test_size, random_state=42)
+# --- Prediction and Display Logic (runs only after button click) ---
+if predict_button:
+    st.subheader("📈 Generating Forecast...")
 
-        # Create and train a linear regression model
-        model = LinearRegression()
-        model.fit(X_train, y_train)
+    # --- Train Prophet Models (on available data - happens on button click) ---
+    models = {}
+    forecasts_full_range = {}
+    price_types = ['modal', 'min', 'max']
 
-        # Predictions on the test set (from available data)
-        y_pred = model.predict(X_test)
+    try:
+        # Define a future range for the overall forecast plot (e.g., end of 2025)
+        last_historical_date = df_available['ds'].max()
+        future_end_date = pd.to_datetime('2026-12-31') # Forecast further into the future for plot
+        # Ensure future dataframe covers the historical range + forecast range
+        future_df = pd.DataFrame({'ds': pd.date_range(start=df_available['ds'].min(), end=future_end_date, freq='D')})
 
-        # Calculate MAE (Mean Absolute Error)
-        mae = mean_absolute_error(y_test, y_pred)
-        st.write(f"Mean Absolute Error on available data test set: {mae:.2f}")
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
-        # Plot: Actual vs Predicted Prices (Test Set from available data)
-        st.subheader("Actual vs Predicted Prices (Test Set - available data)")
-        plt.figure(figsize=(10, 5))
-        # Ensure both y_test and y_pred align for plotting - plot against index
-        plt.plot(y_test.values, label='Actual Prices', color='green')
-        plt.plot(y_pred, label='Predicted Prices', color='red')
-        plt.title('Actual vs Predicted Prices (Test Set)')
-        plt.xlabel('Index of Test Data')
-        plt.ylabel('Price')
+
+        for i, price_type in enumerate(price_types):
+            col_name = f'y_{price_type}'
+            df_prophet = df_available[['ds', col_name]].rename(columns={col_name: 'y'})
+
+            status_text.text(f"Training model for {price_type.capitalize()} Price...")
+            progress_bar.progress((i + 1) / len(price_types))
+
+            # Initialize and train Prophet model
+            model = Prophet()
+            # Suppress model fitting output in Streamlit
+            with suppress_stdout():
+                 model.fit(df_prophet)
+
+            models[price_type] = model # Store the trained model
+
+            # Predict for the full range of dates for the plot
+            forecast = model.predict(future_df)
+            forecasts_full_range[price_type] = forecast
+
+        status_text.text("✅ Models Trained Successfully!")
+        progress_bar.empty() # Hide progress bar
+
+        # --- Display Predicted Price for Selected Date ---
+        st.subheader(f"Predicted Prices on {user_date}:")
+
+        user_date_dt = pd.to_datetime(user_date)
+        user_future_df = pd.DataFrame({'ds': [user_date_dt]})
+
+        predicted_prices_user_date = {}
+
+        for price_type in price_types:
+             model = models[price_type]
+             user_date_forecast = model.predict(user_future_df)
+             predicted_prices_user_date[price_type] = user_date_forecast['yhat'].values[0]
+
+        # Display the predictions
+        st.success(f"📈 Predicted Prices on {user_date}:")
+        st.write(f" - **Modal Price**: ₹{predicted_prices_user_date['modal']:.2f} per quintal")
+        st.write(f" - **Min Price**: ₹{predicted_prices_user_date['min']:.2f} per quintal")
+        st.write(f" - **Max Price**: ₹{predicted_prices_user_date['max']:.2f} per quintal")
+
+
+        # --- Display Forecast Plot ---
+        st.subheader("📊 Price Forecast: Historical and Predicted Trend")
+        fig = plt.figure(figsize=(12, 7))
+
+        # Plot Historical Data Points
+        plt.scatter(df_available['ds'], df_available['y_modal'], color='blue', label='Historical Modal Price', s=10)
+        plt.scatter(df_available['ds'], df_available['y_min'], color='red', label='Historical Min Price', s=10)
+        plt.scatter(df_available['ds'], df_available['y_max'], color='green', label='Historical Max Price', s=10)
+
+        # Plot Predicted Future Trend and Confidence Intervals
+        colors = {'modal': 'darkblue', 'min': 'darkred', 'max': 'darkgreen'}
+
+        for price_type in price_types:
+             forecast = forecasts_full_range[price_type]
+             color = colors[price_type]
+             # Plot only the forecast part of the line, starting from the last historical date
+             plt.plot(forecast['ds'], forecast['yhat'], label=f'Predicted {price_type.capitalize()} Price Trend', color=color)
+             plt.fill_between(forecast['ds'], forecast['yhat_lower'], forecast['yhat_upper'], color=color, alpha=0.2)
+
+
+        # Optional: Mark the user-selected date on the plot
+        if user_date_dt in future_df['ds'].values:
+             # Find the yhat values for the user date from the pre-computed full range forecast
+             y_modal_user_pred_plot = forecasts_full_range['modal'][forecasts_full_range['modal']['ds'] == user_date_dt]['yhat'].values
+             y_min_user_pred_plot = forecasts_full_range['min'][forecasts_full_range['min']['ds'] == user_date_dt]['yhat'].values
+             y_max_user_pred_plot = forecasts_full_range['max'][forecasts_full_range['max']['ds'] == user_date_dt]['yhat'].values
+
+             if y_modal_user_pred_plot.size > 0: # Check if prediction exists for the date
+                 plt.axvline(user_date_dt, color='purple', linestyle='--', alpha=0.7, label=f'Selected Date ({user_date.strftime("%Y-%m-%d")})')
+                 # Optional: Add point markers for the predictions on the selected date
+                 #plt.scatter(user_date_dt, y_modal_user_pred_plot[0], color='purple', s=50, zorder=5)
+                 #plt.scatter(user_date_dt, y_min_user_pred_plot[0], color='purple', s=50, zorder=5)
+                 #plt.scatter(user_date_dt, y_max_user_pred_plot[0], color='purple', s=50, zorder=5)
+
+
+        plt.xlabel("Date")
+        plt.ylabel("Price (INR/quintal)")
+        plt.title("Tomato Price Forecast: Historical Data & Model Prediction")
         plt.legend()
         plt.grid(True)
-        st.pyplot(plt)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        st.pyplot(fig)
 
-    else:
-        st.warning("Not enough data points to perform train-test split for evaluation (need at least 2). Training model on the single available data point.")
-        # Train model on the single available data point if split is not possible
-        model = LinearRegression()
-        # Reshape X_available for fit if it's a single sample
-        model.fit(X_available.values.reshape(1, -1), y_available.values.reshape(1, -1))
-        st.info("Model trained on the available data point.")
+    except Exception as e:
+        st.error(f"An error occurred during prediction: {e}")
+        st.error("Please try again or check the data if you modified it.")
 
 
-    # --- Visualization ---
-
-    # Plot 1: Line Plot of Historical Data (Available data only)
-    st.subheader("Historical Tomato Price Trend (Available Data)")
-    plt.figure(figsize=(10, 5))
-    plt.plot(df_available['Date'], df_available['Avg_Price'], marker='o', color='b', label='Average Price')
-    plt.title('Tomato Price Trend Over Time (Available Data)')
-    plt.xlabel('Date')
-    plt.ylabel('Average Price')
-    plt.legend()
-    plt.grid(True)
-    st.pyplot(plt)
-
-    # Plot 2: Correlation Matrix Heatmap (Using available data)
-    st.subheader("Correlation Matrix (using available data)")
-    plt.figure(figsize=(8, 6))
-    # Include only relevant columns from available data
-    corr_cols = ['Day_of_Year', 'Month', 'Min_Price', 'Max_Price', 'Avg_Price'] # Exclude Year as it's constant
-    sns.heatmap(df_available[corr_cols].corr(), annot=True, cmap='coolwarm', fmt='.2f')
-    plt.title('Correlation Matrix')
-    st.pyplot(plt)
-
-    # --- Predict for the FULL 96 dates and plot the trend ---
-    st.subheader("Projected Tomato Price Trend (Full Date Range based on model)")
-    st.info("This plot shows the model's prediction for the price trend across all dates provided, using a model trained only on the available data.")
-    plt.figure(figsize=(10, 5))
-
-    # Create a DataFrame for the full 96 dates (need to recreate dates and features)
-    df_full_dates = pd.DataFrame({'Date': data['Date']})
-    df_full_dates['Date'] = pd.to_datetime(df_full_dates['Date'], format='%d/%m/%Y')
-    df_full_dates['Day_of_Year'] = df_full_dates['Date'].dt.dayofyear
-    df_full_dates['Month'] = df_full_dates['Date'].dt.month
-    # Assuming the prediction model is based on 'Day_of_Year' and 'Month'
-    X_full_dates = df_full_dates[['Day_of_Year', 'Month']]
-
-
-    # Use the model to predict prices for ALL 96 dates
-    if 'model' in locals(): # Check if the model was successfully trained
-         y_pred_full = model.predict(X_full_dates)
-
-         plt.plot(df_full_dates['Date'], y_pred_full, color='red', label='Predicted Average Price')
-         # Optionally, plot the historical data points on top for comparison
-         plt.scatter(df_available['Date'], df_available['Avg_Price'], color='blue', label='Historical Data Points', zorder=5)
-
-         plt.title('Projected Tomato Price Trend')
-         plt.xlabel('Date')
-         plt.ylabel('Average Price')
-         plt.legend()
-         plt.grid(True)
-         st.pyplot(plt)
-    else:
-        st.warning("Model could not be trained due to insufficient data, so full-year prediction plot is not available.")
-
-
-else:
-    st.error("No price data available in the dataset (after checking lengths) to train the model.")
+# --- Main App Layout ---
+# The main structure is handled by the flow above, no separate main() needed for this simple app
