@@ -131,8 +131,8 @@ plt.show()
 
 # Final prediction plot with trendline
 plt.figure(figsize=(10, 5))
-plt.scatter(X_test['Day_of_Year'], y_test, label='Actual Prices', color='green')
-plt.plot(X_test['Day_of_Year'], y_pred, label='Predicted Prices', color='red')
+plt.scatter(X_test['Day_of_Year'].values, y_test.values, label='Actual Prices', color='green')  # Use .values
+plt.plot(X_test['Day_of_Year'].values, y_pred, label='Predicted Prices', color='red')  # Use .values
 plt.title('Prediction Trendline vs Actual Prices')
 plt.xlabel('Day of Year')
 plt.ylabel('Average Price')
