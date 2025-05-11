@@ -4,116 +4,102 @@ import numpy as np
 from prophet import Prophet
 import matplotlib.pyplot as plt
 
-# --- Function 1: Tomato Price Predictor ---
-def tomato_price_predictor():
-    st.header("🍅 Tomato Price Predictor")
-    st.write("Select a future date to predict the expected tomato price based on historical data.")
+# --- Manual Tomato Price Data (Jan + Feb 2021) ---
+def get_tomato_data():
+    data = [
+        ("01/01/2021", 1200, 1600, 1400), ("02/01/2021", 1200, 1600, 1400), ("03/01/2021", 1200, 1600, 1400),
+        ("04/01/2021", 1200, 1600, 1400), ("06/01/2021", 1000, 1600, 1300), ("07/01/2021", 1000, 1500, 1300),
+        ("08/01/2021", 1000, 1500, 1200), ("09/01/2021", 1000, 1400, 1200), ("11/01/2021", 1000, 1400, 1200),
+        ("12/01/2021", 1000, 1400, 1200), ("13/01/2021", 1000, 1400, 1200), ("16/01/2021", 1000, 1400, 1200),
+        ("17/01/2021", 1000, 1400, 1200), ("18/01/2021", 1000, 1400, 1200), ("20/01/2021", 1000, 1400, 1200),
+        ("21/01/2021", 1000, 1400, 1200), ("22/01/2021", 1000, 1400, 1200), ("23/01/2021", 1000, 1400, 1200),
+        ("24/01/2021", 1000, 1400, 1200), ("25/01/2021", 1000, 1400, 1200), ("27/01/2021", 1000, 1400, 1200),
+        ("28/01/2021", 1000, 1400, 1200), ("30/01/2021", 1000, 1400, 1200),
+        ("01/02/2021", 1200, 1600, 1400), ("02/02/2021", 1200, 1600, 1300), ("03/02/2021", 1200, 1600, 1300),
+        ("04/02/2021", 1200, 1600, 1300), ("05/02/2021", 1200, 1600, 1300), ("06/02/2021", 1200, 1600, 1300),
+        ("08/02/2021", 1200, 1600, 1300), ("09/02/2021", 1200, 1600, 1300), ("10/02/2021", 1200, 1600, 1300),
+        ("11/02/2021", 1200, 1600, 1300), ("12/02/2021", 1200, 1600, 1400), ("15/02/2021", 1200, 1600, 1400),
+        ("18/02/2021", 1000, 1400, 1200), ("20/02/2021", 1000, 1400, 1200), ("22/02/2021", 1000, 1400, 1200),
+        ("23/02/2021", 1000, 1400, 1200), ("24/02/2021", 1000, 1400, 1200), ("25/02/2021", 1000, 1400, 1200),
+    ]
+    df = pd.DataFrame(data, columns=["Date", "Min", "Max", "Modal"])
+    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
+    return df
 
-    # User-selected date
-    user_date = st.date_input("📅 Pick a future date", pd.to_datetime("2024-12-01"))
-
-    # Simulated historical data
-    dates = pd.date_range(start="2019-01-01", end="2024-12-31", freq="M")
-    prices = np.random.normal(loc=2500, scale=300, size=len(dates))  # INR per quintal
-    df = pd.DataFrame({"ds": dates, "y": prices})
-
-    # Train Prophet model
+# --- Train Prophet Model ---
+def train_model(df, column_name):
+    model_df = df.rename(columns={"Date": "ds", column_name: "y"})[["ds", "y"]]
     model = Prophet()
-    model.fit(df)
-
-    # Predict next 365 days
+    model.fit(model_df)
     future = model.make_future_dataframe(periods=365)
     forecast = model.predict(future)
+    return forecast
 
-    # Find prediction for user-selected date
-    selected = forecast[forecast['ds'] == pd.to_datetime(user_date)]
-    if not selected.empty:
-        predicted_price = selected['yhat'].values[0]
-        st.success(f"📈 Predicted Tomato Price on {user_date}: ₹{predicted_price:.2f} per quintal")
-    else:
-        st.warning("⚠️ Please select a date within the prediction range (up to 1 year ahead).")
-
-    # Plotting
-    st.subheader("📊 Forecast Graph")
-    fig = plt.figure(figsize=(10, 6))
-    plt.plot(forecast['ds'], forecast['yhat'], label='Predicted Price', color='green')
-    plt.fill_between(forecast['ds'], forecast['yhat_lower'], forecast['yhat_upper'], alpha=0.3, label='Confidence Interval')
+# --- Plot Forecast ---
+def plot_forecast(forecast, title, user_date):
+    fig = plt.figure(figsize=(10, 4))
+    plt.plot(forecast["ds"], forecast["yhat"], label="Forecast")
+    plt.fill_between(forecast["ds"], forecast["yhat_lower"], forecast["yhat_upper"], alpha=0.3)
+    plt.axvline(pd.to_datetime(user_date), color="red", linestyle="--", label="Prediction Date")
+    plt.title(title)
     plt.xlabel("Date")
     plt.ylabel("Price (INR/quintal)")
-    plt.title("Tomato Price Forecast")
     plt.legend()
-    st.pyplot(fig)
+    return fig
 
-# --- Function 2: Crop Health Assessor ---
-def crop_health_assessor():
-    st.header("🌿 Crop Health & Growth Stage Assessor")
-    st.write("Enter NPK values and crop age to assess the current health status of your crop.")
+# --- Main Tomato Price Predictor App ---
+def tomato_price_predictor():
+    st.header("🍅 Tomato Price Predictor (Min / Max / Modal)")
+    user_date = st.date_input("📅 Pick a future date", pd.to_datetime("2024-12-01"))
 
-    # Inputs
-    n = st.number_input("🌱 Nitrogen (N)", 0, 300, 150)
-    p = st.number_input("🌼 Phosphorus (P)", 0, 300, 100)
-    k = st.number_input("🍂 Potassium (K)", 0, 300, 200)
-    crop_age = st.number_input("🕒 Crop Age (in days)", 1, 200, 50)
+    df = get_tomato_data()
 
-    # Determine growth stage
-    if crop_age <= 30:
-        stage = "Seedling"
-    elif crop_age <= 60:
-        stage = "Vegetative"
-    elif crop_age <= 90:
-        stage = "Flowering"
-    elif crop_age <= 120:
-        stage = "Fruiting"
+    # Forecasts
+    forecast_modal = train_model(df, "Modal")
+    forecast_min = train_model(df, "Min")
+    forecast_max = train_model(df, "Max")
+
+    # Get predicted values for selected date
+    def get_price(forecast):
+        row = forecast[forecast["ds"] == pd.to_datetime(user_date)]
+        return row["yhat"].values[0] if not row.empty else None
+
+    modal_price = get_price(forecast_modal)
+    min_price = get_price(forecast_min)
+    max_price = get_price(forecast_max)
+
+    if None not in (modal_price, min_price, max_price):
+        st.success(f"📌 Predicted Prices for {user_date.strftime('%d-%b-%Y')}:")
+        st.markdown(f"""
+        - ✅ **Modal Price**: ₹{modal_price:.2f}  
+        - 🔻 **Min Price**: ₹{min_price:.2f}  
+        - 🔺 **Max Price**: ₹{max_price:.2f}
+        """)
     else:
-        stage = "Maturity"
+        st.warning("⚠️ Unable to predict for the selected date. Try a closer one.")
 
-    # Recommended NPK ranges
-    norms = {
-        "Seedling": {"N": (50, 100), "P": (30, 60), "K": (100, 150)},
-        "Vegetative": {"N": (100, 150), "P": (50, 90), "K": (150, 200)},
-        "Flowering": {"N": (120, 170), "P": (70, 110), "K": (180, 230)},
-        "Fruiting": {"N": (130, 180), "P": (80, 120), "K": (200, 250)},
-        "Maturity": {"N": (100, 150), "P": (60, 90), "K": (150, 200)}
-    }
+    # Forecast Graphs
+    st.subheader("📈 Modal Price Forecast")
+    st.pyplot(plot_forecast(forecast_modal, "Forecast: Modal Price", user_date))
 
-    ideal = norms[stage]
+    st.subheader("📉 Min Price Forecast")
+    st.pyplot(plot_forecast(forecast_min, "Forecast: Minimum Price", user_date))
 
-    # Nutrient status checker
-    def assess(value, ideal_range):
-        if ideal_range[0] <= value <= ideal_range[1]:
-            return "✅ Optimal"
-        elif value < ideal_range[0]:
-            return "🔻 Low"
-        else:
-            return "🔺 High"
+    st.subheader("📊 Max Price Forecast")
+    st.pyplot(plot_forecast(forecast_max, "Forecast: Maximum Price", user_date))
 
-    # Display results
-    st.subheader("📋 Health Assessment")
-    st.write(f"**🌾 Growth Stage**: {stage}")
-    st.write(f"- **Nitrogen (N)**: {assess(n, ideal['N'])} (Ideal: {ideal['N'][0]}–{ideal['N'][1]})")
-    st.write(f"- **Phosphorus (P)**: {assess(p, ideal['P'])} (Ideal: {ideal['P'][0]}–{ideal['P'][1]})")
-    st.write(f"- **Potassium (K)**: {assess(k, ideal['K'])} (Ideal: {ideal['K'][0]}–{ideal['K'][1]})")
+    # Historical data
+    st.subheader("📋 Historical Data Used")
+    st.dataframe(df)
 
-    # Final suggestion
-    if all(assess(val, ideal[key]) == "✅ Optimal" for val, key in zip([n, p, k], ['N', 'P', 'K'])):
-        st.success("🌟 Your crop is in excellent health! Keep maintaining the balance.")
-    else:
-        st.warning("⚠️ Your crop needs nutrient adjustment based on current growth stage.")
-
-# --- Main Layout ---
+# --- Streamlit App Layout ---
 def main():
-    st.set_page_config(page_title="AgriAI Assistant", page_icon="🌾", layout="centered")
-    st.title("🌾 AgriAI Smart Assistant")
-    st.write("An AI-powered tool for Tomato Price Forecasting and Crop Health Monitoring.")
-
+    st.title("🌾 Smart Agriculture Assistant")
     st.sidebar.title("🔍 Choose Feature")
-    app_mode = st.sidebar.radio("Select Option", ["Tomato Price Predictor", "Crop Health Assessor"])
+    app_mode = st.sidebar.radio("Select Option", ["Tomato Price Predictor"])
 
     if app_mode == "Tomato Price Predictor":
         tomato_price_predictor()
-    elif app_mode == "Crop Health Assessor":
-        crop_health_assessor()
 
-# Run the app
 if __name__ == "__main__":
     main()
