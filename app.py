@@ -24,76 +24,124 @@ data = {
     'Min_Price': [400, 600, 600, 600, 500, 600, 500, 600, 800, 1000, 800, 1000, 1200, 1000, 1200, 1200, 1000, 1000, 900, 1000, 1200,
                   1000, 1200, 1000, 1200, 800, 1000, 1200, 1000, 1200, 800, 1200, 1000, 1200, 1500, 1500, 1500, 1200, 1200, 1500,
                   2000, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 2000, 2000, 2000, 2000, 2000, 2000, 2500, 2000, 2000, 2000,
-                  4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000],
+                  4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000], # Has 68 entries
     'Max_Price': [1000, 1200, 1000, 1200, 1200, 1000, 1200, 1000, 1200, 1400, 1200, 1400, 1600, 1400, 1600, 1600, 1400, 1400,
                   1300, 1400, 1600, 1400, 1600, 1400, 1600, 1000, 1400, 1600, 1400, 1600, 1000, 1400, 1600, 1400, 1700, 1800,
                   1800, 1600, 1600, 1800, 2000, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 2000, 2000, 2000, 2000, 2000, 2000,
-                  2500, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000],
+                  2500, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000], # Has 68 entries
     'Avg_Price': [800, 900, 800, 900, 900, 800, 900, 800, 900, 1100, 900, 1100, 1400, 1100, 1400, 1400, 1100, 1100, 1000, 1100,
                   1400, 1100, 1400, 1100, 1400, 900, 1100, 1400, 1100, 1400, 900, 1100, 1400, 1100, 1350, 1400, 1400, 1300,
                   1300, 1400, 1600, 1400, 1400, 1400, 1400, 1400, 1400, 1400, 1600, 1600, 1600, 1600, 1600, 1600, 2000, 1600,
-                  1600, 1600, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000]
+                  1600, 1600, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000] # Has 68 entries
 }
 
-# Check if the lengths are equal for all lists
-if all(len(value) == len(data['Date']) for key, value in data.items()):
-    # Convert the Date column to datetime format
-    df = pd.DataFrame(data)
-    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
+# Create DataFrame from the data
+# Pandas will automatically use the longest list for the index length (96)
+# and fill shorter lists with NaN.
+df = pd.DataFrame(data)
 
-    # Feature Engineering: Extract Date features
-    df['Day_of_Year'] = df['Date'].dt.dayofyear
-    df['Month'] = df['Date'].dt.month
-    df['Year'] = df['Date'].dt.year
+# Convert the Date column to datetime format
+df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
 
-    # Prepare the dataset for training
-    X = df[['Day_of_Year', 'Month', 'Year']]
-    y = df['Avg_Price']
+# Feature Engineering: Extract Date features for ALL 96 dates
+df['Day_of_Year'] = df['Date'].dt.dayofyear
+df['Month'] = df['Date'].dt.month
+df['Year'] = df['Date'].dt.year
 
-    # Train-test split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+st.title("Tomato Price Analysis and Prediction")
 
-    # Create and train a linear regression model
-    model = LinearRegression()
-    model.fit(X_train, y_train)
+# Acknowledge the data inconsistency
+st.warning(f"Note: The dataset contains {len(df['Date'])} dates but only {df['Avg_Price'].count()} entries for price data.")
 
-    # Predictions
-    y_pred = model.predict(X_test)
+# --- Train and Evaluate Model on AVAILABLE Data ---
+# Use only the rows where price data is available for training/evaluation
+df_available = df.dropna(subset=['Avg_Price']).copy() # Use copy() to avoid SettingWithCopyWarning
 
-    # Calculate MAE (Mean Absolute Error)
-    mae = mean_absolute_error(y_test, y_pred)
-    st.write(f"Mean Absolute Error: {mae}")
+if not df_available.empty:
+    st.subheader("Model Training and Evaluation (using available data)")
 
-    # Plot 1: Line Plot of Historical Data
-    st.subheader("Tomato Price Trend Over Time")
+    # Prepare the dataset for training using available data
+    X_available = df_available[['Day_of_Year', 'Month', 'Year']]
+    y_available = df_available['Avg_Price']
+
+    # Train-test split (on available data)
+    # Check if there's enough data to split
+    if len(df_available) >= 2:
+        X_train, X_test, y_train, y_test = train_test_split(X_available, y_available, test_size=0.2, random_state=42)
+
+        # Create and train a linear regression model
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+
+        # Predictions on the test set (from available data)
+        y_pred = model.predict(X_test)
+
+        # Calculate MAE (Mean Absolute Error)
+        mae = mean_absolute_error(y_test, y_pred)
+        st.write(f"Mean Absolute Error on available data test set: {mae:.2f}")
+
+        # Plot: Actual vs Predicted Prices (Test Set from available data)
+        st.subheader("Actual vs Predicted Prices (Test Set - available data)")
+        plt.figure(figsize=(10, 5))
+        # Ensure both y_test and y_pred have the same index or plot against index
+        plt.plot(y_test.values, label='Actual Prices', color='green')
+        plt.plot(y_pred, label='Predicted Prices', color='red')
+        plt.title('Actual vs Predicted Prices (Test Set)')
+        plt.xlabel('Index of Test Data')
+        plt.ylabel('Price')
+        plt.legend()
+        plt.grid(True)
+        st.pyplot(plt)
+
+    else:
+        st.warning("Not enough data points (only 68 available) to perform train-test split for evaluation.")
+        # Train model on all available data if split is not possible
+        model = LinearRegression()
+        model.fit(X_available, y_available)
+        st.info("Model trained on all 68 available data points.")
+
+
+    # --- Visualization ---
+
+    # Plot 1: Line Plot of Historical Data (Available data only)
+    st.subheader("Historical Tomato Price Trend (Available Data)")
     plt.figure(figsize=(10, 5))
-    plt.plot(df['Date'], df['Avg_Price'], marker='o', color='b', label='Average Price')
-    plt.title('Tomato Price Trend Over Time')
+    plt.plot(df_available['Date'], df_available['Avg_Price'], marker='o', color='b', label='Average Price')
+    plt.title('Tomato Price Trend Over Time (Available Data)')
     plt.xlabel('Date')
     plt.ylabel('Average Price')
     plt.legend()
     plt.grid(True)
     st.pyplot(plt)
 
-    # Plot 2: Correlation Matrix Heatmap
-    st.subheader("Correlation Matrix")
+    # Plot 2: Correlation Matrix Heatmap (Using available data)
+    st.subheader("Correlation Matrix (using available data)")
     plt.figure(figsize=(8, 6))
-    sns.heatmap(df[['Day_of_Year', 'Month', 'Year', 'Min_Price', 'Max_Price', 'Avg_Price']].corr(), annot=True, cmap='coolwarm', fmt='.2f')
+    # Include only relevant columns from available data
+    corr_cols = ['Day_of_Year', 'Month', 'Year', 'Min_Price', 'Max_Price', 'Avg_Price']
+    sns.heatmap(df_available[corr_cols].corr(), annot=True, cmap='coolwarm', fmt='.2f')
     plt.title('Correlation Matrix')
     st.pyplot(plt)
 
-    # Plot 3: Forecasted Price vs Actual Price
-    st.subheader("Actual vs Predicted Prices (Test Set)")
+    # --- Predict for the FULL 96 dates and plot the trend ---
+    st.subheader("Predicted Tomato Price Trend (Full Year based on model)")
     plt.figure(figsize=(10, 5))
-    # Ensure both y_test and y_pred have the same index or plot against index
-    plt.plot(y_test.values, label='Actual Prices', color='green') # Using .values is safer here as y_test is a Series
-    plt.plot(y_pred, label='Predicted Prices', color='red')
-    plt.title('Actual vs Predicted Prices')
-    plt.xlabel('Index of Test Data')
-    plt.ylabel('Price')
+
+    # Use the model to predict prices for ALL 96 dates
+    X_full_dates = df[['Day_of_Year', 'Month', 'Year']]
+    y_pred_full = model.predict(X_full_dates)
+
+    plt.plot(df['Date'], y_pred_full, color='red', label='Predicted Average Price (Full Year)')
+    # Optionally, plot the historical data points on top for comparison
+    plt.scatter(df_available['Date'], df_available['Avg_Price'], color='blue', label='Historical Data Points', zorder=5)
+
+    plt.title('Projected Tomato Price Trend (based on model trained on historical data)')
+    plt.xlabel('Date')
+    plt.ylabel('Average Price')
     plt.legend()
     plt.grid(True)
-    st.pyplot(plt) # Use st.pyplot here to display in Streamlit
+    st.pyplot(plt)
+
 
 else:
-    st.error("Data lists have unequal lengths. Please check the dataset.")
+    st.error("No price data available in the dataset to train the model.")
