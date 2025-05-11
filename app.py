@@ -82,7 +82,7 @@ if all(len(value) == len(data['Date']) for key, value in data.items()):
 
 # Plot 3: Forecasted Price vs Actual Price
 plt.figure(figsize=(10, 5))
-plt.plot(y_test.values, label='Actual Prices', color='green')
+plt.plot(y_test, label='Actual Prices', color='green')  # Directly use y_test without .values
 plt.plot(y_pred, label='Predicted Prices', color='red')
 plt.title('Actual vs Predicted Prices')
 plt.xlabel('Index')
