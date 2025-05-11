@@ -80,9 +80,14 @@ if all(len(value) == len(data['Date']) for key, value in data.items()):
     plt.title('Correlation Matrix')
     st.pyplot(plt)
 
-    # Plot 3: Forecasted Price vs Actual Price
-    plt.figure(figsize=(10, 5))
-    plt.plot(y_test.values, label='Actual Prices', color='green')
-    plt.plot(y_pred, label='Predicted Prices', color='red')
-    plt.title('Actual vs Predicted Prices')
-    plt.xlabel('Index
+# Plot 3: Forecasted Price vs Actual Price
+plt.figure(figsize=(10, 5))
+plt.plot(y_test.values, label='Actual Prices', color='green')
+plt.plot(y_pred, label='Predicted Prices', color='red')
+plt.title('Actual vs Predicted Prices')
+plt.xlabel('Index')
+plt.ylabel('Price')
+plt.legend()
+plt.grid(True)
+plt.show()
+
