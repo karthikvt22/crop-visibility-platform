@@ -1,105 +1,132 @@
-import streamlit as st
 import pandas as pd
 import numpy as np
-from prophet import Prophet
 import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error
+import statsmodels.api as sm
 
-# --- Manual Tomato Price Data (Jan + Feb 2021) ---
-def get_tomato_data():
-    data = [
-        ("01/01/2021", 1200, 1600, 1400), ("02/01/2021", 1200, 1600, 1400), ("03/01/2021", 1200, 1600, 1400),
-        ("04/01/2021", 1200, 1600, 1400), ("06/01/2021", 1000, 1600, 1300), ("07/01/2021", 1000, 1500, 1300),
-        ("08/01/2021", 1000, 1500, 1200), ("09/01/2021", 1000, 1400, 1200), ("11/01/2021", 1000, 1400, 1200),
-        ("12/01/2021", 1000, 1400, 1200), ("13/01/2021", 1000, 1400, 1200), ("16/01/2021", 1000, 1400, 1200),
-        ("17/01/2021", 1000, 1400, 1200), ("18/01/2021", 1000, 1400, 1200), ("20/01/2021", 1000, 1400, 1200),
-        ("21/01/2021", 1000, 1400, 1200), ("22/01/2021", 1000, 1400, 1200), ("23/01/2021", 1000, 1400, 1200),
-        ("24/01/2021", 1000, 1400, 1200), ("25/01/2021", 1000, 1400, 1200), ("27/01/2021", 1000, 1400, 1200),
-        ("28/01/2021", 1000, 1400, 1200), ("30/01/2021", 1000, 1400, 1200),
-        ("01/02/2021", 1200, 1600, 1400), ("02/02/2021", 1200, 1600, 1300), ("03/02/2021", 1200, 1600, 1300),
-        ("04/02/2021", 1200, 1600, 1300), ("05/02/2021", 1200, 1600, 1300), ("06/02/2021", 1200, 1600, 1300),
-        ("08/02/2021", 1200, 1600, 1300), ("09/02/2021", 1200, 1600, 1300), ("10/02/2021", 1200, 1600, 1300),
-        ("11/02/2021", 1200, 1600, 1300), ("12/02/2021", 1200, 1600, 1400), ("15/02/2021", 1200, 1600, 1400),
-        ("18/02/2021", 1000, 1400, 1200), ("20/02/2021", 1000, 1400, 1200), ("22/02/2021", 1000, 1400, 1200),
-        ("23/02/2021", 1000, 1400, 1200), ("24/02/2021", 1000, 1400, 1200), ("25/02/2021", 1000, 1400, 1200),
-    ]
-    df = pd.DataFrame(data, columns=["Date", "Min", "Max", "Modal"])
-    df["Date"] = pd.to_datetime(df["Date"], dayfirst=True)
-    return df
+# Dataset you provided
+data = {
+    'Date': ['01/01/2021', '02/01/2021', '03/01/2021', '04/01/2021', '05/01/2021', '06/01/2021', '07/01/2021', '08/01/2021', 
+             '01/02/2021', '02/02/2021', '03/02/2021', '04/02/2021', '05/02/2021', '06/02/2021', '07/02/2021', '08/02/2021', 
+             '01/03/2021', '02/03/2021', '03/03/2021', '04/03/2021', '05/03/2021', '06/03/2021', '07/03/2021', '08/03/2021',
+             '01/04/2021', '02/04/2021', '03/04/2021', '04/04/2021', '05/04/2021', '06/04/2021', '07/04/2021', '08/04/2021',
+             '01/05/2021', '02/05/2021', '03/05/2021', '04/05/2021', '05/05/2021', '06/05/2021', '07/05/2021', '08/05/2021', 
+             '01/06/2021', '02/06/2021', '03/06/2021', '04/06/2021', '05/06/2021', '06/06/2021', '07/06/2021', '08/06/2021', 
+             '01/07/2021', '02/07/2021', '03/07/2021', '04/07/2021', '05/07/2021', '06/07/2021', '07/07/2021', '08/07/2021', 
+             '01/08/2021', '02/08/2021', '03/08/2021', '04/08/2021', '05/08/2021', '06/08/2021', '07/08/2021', '08/08/2021',
+             '01/09/2021', '02/09/2021', '03/09/2021', '04/09/2021', '05/09/2021', '06/09/2021', '07/09/2021', '08/09/2021', 
+             '01/10/2021', '02/10/2021', '03/10/2021', '04/10/2021', '05/10/2021', '06/10/2021', '07/10/2021', '08/10/2021', 
+             '01/11/2021', '02/11/2021', '03/11/2021', '04/11/2021', '05/11/2021', '06/11/2021', '07/11/2021', '08/11/2021', 
+             '01/12/2021', '02/12/2021', '03/12/2021', '04/12/2021', '05/12/2021', '06/12/2021', '07/12/2021', '08/12/2021'],
+    'Min_Price': [400, 600, 600, 600, 500, 600, 500, 600, 800, 1000, 800, 1000, 1200, 1000, 1200, 1200, 1000, 1000, 900, 1000, 1200, 
+                  1000, 1200, 1000, 1200, 800, 1000, 1200, 1000, 1200, 800, 1200, 1000, 1200, 1500, 1500, 1500, 1200, 1200, 1500, 
+                  2000, 1500, 1500, 1500, 1500, 1500, 1500, 1500, 2000, 2000, 2000, 2000, 2000, 2000, 2500, 2000, 2000, 2000, 
+                  4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000],
+    'Max_Price': [1000, 1200, 1000, 1200, 1200, 1000, 1200, 1000, 1200, 1400, 1200, 1400, 1600, 1400, 1600, 1600, 1400, 1400, 
+                  1300, 1400, 1600, 1400, 1600, 1400, 1600, 1000, 1400, 1600, 1400, 1600, 1000, 1400, 1600, 1400, 1700, 1800, 
+                  1800, 1600, 1600, 1800, 2000, 1800, 1800, 1800, 1800, 1800, 1800, 1800, 2000, 2000, 2000, 2000, 2000, 2000, 
+                  2500, 2000, 2000, 2000, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 3000],
+    'Avg_Price': [800, 900, 800, 900, 900, 800, 900, 800, 900, 1100, 900, 1100, 1400, 1100, 1400, 1400, 1100, 1100, 1000, 1100, 
+                  1400, 1100, 1400, 1100, 1400, 900, 1100, 1400, 1100, 1400, 900, 1100, 1400, 1100, 1350, 1400, 1400, 1300, 
+                  1300, 1400, 1600, 1400, 1400, 1400, 1400, 1400, 1400, 1400, 1600, 1600, 1600, 1600, 1600, 1600, 2000, 1600, 
+                  1600, 1600, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000]
+}
 
-# --- Train Prophet Model ---
-def train_model(df, column_name):
-    model_df = df.rename(columns={"Date": "ds", column_name: "y"})[["ds", "y"]]
-    model = Prophet()
-    model.fit(model_df)
-    future = model.make_future_dataframe(periods=365)
-    forecast = model.predict(future)
-    return forecast
+# Convert the Date column to datetime format
+df = pd.DataFrame(data)
+df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
 
-# --- Plot Forecast ---
-def plot_forecast(forecast, title, user_date):
-    fig = plt.figure(figsize=(10, 4))
-    plt.plot(forecast["ds"], forecast["yhat"], label="Forecast")
-    plt.fill_between(forecast["ds"], forecast["yhat_lower"], forecast["yhat_upper"], alpha=0.3)
-    plt.axvline(pd.to_datetime(user_date), color="red", linestyle="--", label="Prediction Date")
-    plt.title(title)
-    plt.xlabel("Date")
-    plt.ylabel("Price (INR/quintal)")
-    plt.legend()
-    return fig
+# Feature Engineering: Extract Date features
+df['Day_of_Year'] = df['Date'].dt.dayofyear
+df['Month'] = df['Date'].dt.month
+df['Year'] = df['Date'].dt.year
 
-# --- Main Tomato Price Predictor App ---
-def tomato_price_predictor():
-    st.header("🍅 Tomato Price Predictor (Min / Max / Modal)")
-    user_date = st.date_input("📅 Pick a future date", pd.to_datetime("2024-12-01"))
+# Prepare the dataset for training
+X = df[['Day_of_Year', 'Month', 'Year']]
+y = df['Avg_Price']
 
-    df = get_tomato_data()
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Forecasts
-    forecast_modal = train_model(df, "Modal")
-    forecast_min = train_model(df, "Min")
-    forecast_max = train_model(df, "Max")
+# Create and train a linear regression model
+model = LinearRegression()
+model.fit(X_train, y_train)
 
-    # Get predicted values for selected date
-    def get_price(forecast):
-        row = forecast[forecast["ds"] == pd.to_datetime(user_date)]
-        return row["yhat"].values[0] if not row.empty else None
+# Predictions
+y_pred = model.predict(X_test)
 
-    modal_price = get_price(forecast_modal)
-    min_price = get_price(forecast_min)
-    max_price = get_price(forecast_max)
+# Calculate MAE (Mean Absolute Error)
+mae = mean_absolute_error(y_test, y_pred)
+print(f"Mean Absolute Error: {mae}")
 
-    if None not in (modal_price, min_price, max_price):
-        st.success(f"📌 Predicted Prices for {user_date.strftime('%d-%b-%Y')}:")
-        st.markdown(f"""
-        - ✅ **Modal Price**: ₹{modal_price:.2f}  
-        - 🔻 **Min Price**: ₹{min_price:.2f}  
-        - 🔺 **Max Price**: ₹{max_price:.2f}
-        """)
-    else:
-        st.warning("⚠️ Unable to predict for the selected date. Try a closer one.")
+# Plot 1: Line Plot of Historical Data
+plt.figure(figsize=(10, 5))
+plt.plot(df['Date'], df['Avg_Price'], marker='o', color='b', label='Average Price')
+plt.title('Tomato Price Trend Over Time')
+plt.xlabel('Date')
+plt.ylabel('Average Price')
+plt.legend()
+plt.grid(True)
+plt.show()
 
-    # Forecast Graphs
-    st.subheader("📈 Modal Price Forecast")
-    st.pyplot(plot_forecast(forecast_modal, "Forecast: Modal Price", user_date))
+# Plot 2: Correlation Matrix Heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(df[['Day_of_Year', 'Month', 'Year', 'Min_Price', 'Max_Price', 'Avg_Price']].corr(), annot=True, cmap='coolwarm', fmt='.2f')
+plt.title('Correlation Matrix')
+plt.show()
 
-    st.subheader("📉 Min Price Forecast")
-    st.pyplot(plot_forecast(forecast_min, "Forecast: Minimum Price", user_date))
+# Plot 3: Forecasted Price vs Actual Price
+plt.figure(figsize=(10, 5))
+plt.plot(y_test.values, label='Actual Prices', color='green')
+plt.plot(y_pred, label='Predicted Prices', color='red')
+plt.title('Actual vs Predicted Prices')
+plt.xlabel('Index')
+plt.ylabel('Price')
+plt.legend()
+plt.grid(True)
+plt.show()
 
-    st.subheader("📊 Max Price Forecast")
-    st.pyplot(plot_forecast(forecast_max, "Forecast: Maximum Price", user_date))
+# # Summary of model
+# X2 = sm.add_constant(X_train)
+# model_sm = sm.OLS(y_train, X2)
+# results = model_sm.fit()
+# print(results.summary())
+# Summary of the model using statsmodels
+X2 = sm.add_constant(X_train)  # Add constant to the independent variables for OLS
+model_sm = sm.OLS(y_train, X2)  # OLS (Ordinary Least Squares) regression model
+results = model_sm.fit()  # Fit the model
+print(results.summary())  # Print the model summary
 
-    # Historical data
-    st.subheader("📋 Historical Data Used")
-    st.dataframe(df)
+# Plot 4: Residuals Plot
+residuals = y_test - y_pred
+plt.figure(figsize=(10, 5))
+plt.scatter(y_pred, residuals, color='purple', alpha=0.5)
+plt.axhline(y=0, color='r', linestyle='--')
+plt.title('Residuals vs Predicted Prices')
+plt.xlabel('Predicted Price')
+plt.ylabel('Residuals')
+plt.grid(True)
+plt.show()
 
-# --- Streamlit App Layout ---
-def main():
-    st.title("🌾 Smart Agriculture Assistant")
-    st.sidebar.title("🔍 Choose Feature")
-    app_mode = st.sidebar.radio("Select Option", ["Tomato Price Predictor"])
+# Plot 5: Histogram of Residuals
+plt.figure(figsize=(10, 5))
+sns.histplot(residuals, kde=True, color='orange')
+plt.title('Distribution of Residuals')
+plt.xlabel('Residuals')
+plt.ylabel('Frequency')
+plt.grid(True)
+plt.show()
 
-    if app_mode == "Tomato Price Predictor":
-        tomato_price_predictor()
-
-if __name__ == "__main__":
-    main()
+# Final prediction plot with trendline
+plt.figure(figsize=(10, 5))
+plt.scatter(X_test['Day_of_Year'], y_test, label='Actual Prices', color='green')
+plt.plot(X_test['Day_of_Year'], y_pred, label='Predicted Prices', color='red')
+plt.title('Prediction Trendline vs Actual Prices')
+plt.xlabel('Day of Year')
+plt.ylabel('Average Price')
+plt.legend()
+plt.grid(True)
+plt.show()
