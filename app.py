@@ -34,8 +34,22 @@ data = {
                   1600, 1600, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000]
 }
 
-# Convert the Date column to datetime format
+# Check lengths of columns in data
+data_lengths = {key: len(value) for key, value in data.items()}
+print("Column lengths:", data_lengths)
+
+# Ensure all columns are the same length
+if len(set(data_lengths.values())) != 1:
+    print("Warning: Columns have different lengths. Adjusting the data...")
+    # You can either trim the extra rows or fill missing values
+    min_length = min(data_lengths.values())  # Get the shortest column length
+    for key in data:
+        data[key] = data[key][:min_length]  # Trim to the shortest length
+
+# Now create the DataFrame
 df = pd.DataFrame(data)
+
+# Convert the Date column to datetime format
 df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
 
 # Feature Engineering: Extract Date features
@@ -88,12 +102,7 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-# # Summary of model
-# X2 = sm.add_constant(X_train)
-# model_sm = sm.OLS(y_train, X2)
-# results = model_sm.fit()
-# print(results.summary())
-# Summary of the model using statsmodels
+# Summary of model using statsmodels
 X2 = sm.add_constant(X_train)  # Add constant to the independent variables for OLS
 model_sm = sm.OLS(y_train, X2)  # OLS (Ordinary Least Squares) regression model
 results = model_sm.fit()  # Fit the model
@@ -125,6 +134,10 @@ plt.scatter(X_test['Day_of_Year'], y_test, label='Actual Prices', color='green')
 plt.plot(X_test['Day_of_Year'], y_pred, label='Predicted Prices', color='red')
 plt.title('Prediction Trendline vs Actual Prices')
 plt.xlabel('Day of Year')
+plt.ylabel('Average Price')
+plt.legend()
+plt.grid(True)
+plt.show()
 plt.ylabel('Average Price')
 plt.legend()
 plt.grid(True)
