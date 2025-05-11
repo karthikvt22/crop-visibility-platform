@@ -1,7 +1,10 @@
-streamlit
 pandas
 numpy
 matplotlib
-prophet
 seaborn
-
+scikit-learn
+statsmodels
+streamlit
+plotly
+scipy
+joblib
