@@ -7,7 +7,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 import statsmodels.api as sm
 
-# Sample data for testing
 # Dataset you provided
 data = {
     'Date': ['01/01/2021', '02/01/2021', '03/01/2021', '04/01/2021', '05/01/2021', '06/01/2021', '07/01/2021', '08/01/2021', 
@@ -36,9 +35,8 @@ data = {
                   1600, 1600, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000]
 }
 
-
-# Ensure all lists have the same length
-if len(data['Date']) == len(data['Avg_Price']) == len(data['Min_Price']) == len(data['Max_Price']):
+# Check if the lengths are equal for all lists
+if all(len(value) == len(data['Date']) for key, value in data.items()):
     # Convert the Date column to datetime format
     df = pd.DataFrame(data)
     df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
@@ -87,48 +85,4 @@ if len(data['Date']) == len(data['Avg_Price']) == len(data['Min_Price']) == len(
     plt.plot(y_test.values, label='Actual Prices', color='green')
     plt.plot(y_pred, label='Predicted Prices', color='red')
     plt.title('Actual vs Predicted Prices')
-    plt.xlabel('Index')
-    plt.ylabel('Price')
-    plt.legend()
-    plt.grid(True)
-    st.pyplot(plt)
-
-    # Summary of model
-    X2 = sm.add_constant(X_train)  # Add constant to the independent variables for OLS
-    model_sm = sm.OLS(y_train, X2)  # OLS (Ordinary Least Squares) regression model
-    results = model_sm.fit()  # Fit the model
-    st.write(results.summary())  # Print the model summary
-
-    # Plot 4: Residuals Plot
-    residuals = y_test - y_pred
-    plt.figure(figsize=(10, 5))
-    plt.scatter(y_pred, residuals, color='purple', alpha=0.5)
-    plt.axhline(y=0, color='r', linestyle='--')
-    plt.title('Residuals vs Predicted Prices')
-    plt.xlabel('Predicted Price')
-    plt.ylabel('Residuals')
-    plt.grid(True)
-    st.pyplot(plt)
-
-    # Plot 5: Histogram of Residuals
-    plt.figure(figsize=(10, 5))
-    sns.histplot(residuals, kde=True, color='orange')
-    plt.title('Distribution of Residuals')
-    plt.xlabel('Residuals')
-    plt.ylabel('Frequency')
-    plt.grid(True)
-    st.pyplot(plt)
-
-    # Final prediction plot with trendline
-    plt.figure(figsize=(10, 5))
-    plt.scatter(X_test['Day_of_Year'].values, y_test.values, label='Actual Prices', color='green')  # Use .values
-    plt.plot(X_test['Day_of_Year'].values, y_pred, label='Predicted Prices', color='red')  # Use .values
-    plt.title('Prediction Trendline vs Actual Prices')
-    plt.xlabel('Day of Year')
-    plt.ylabel('Average Price')
-    plt.legend()
-    plt.grid(True)
-    st.pyplot(plt)
-
-else:
-    st.error("Mismatch in the length of data columns. Please check the data.")
+    plt.xlabel('Index
