@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error  # Correct import for MAE
+import statsmodels.api as sm
 
 # Dataset you provided
 data = {
@@ -134,10 +135,6 @@ plt.scatter(X_test['Day_of_Year'], y_test, label='Actual Prices', color='green')
 plt.plot(X_test['Day_of_Year'], y_pred, label='Predicted Prices', color='red')
 plt.title('Prediction Trendline vs Actual Prices')
 plt.xlabel('Day of Year')
-plt.ylabel('Average Price')
-plt.legend()
-plt.grid(True)
-plt.show()
 plt.ylabel('Average Price')
 plt.legend()
 plt.grid(True)
